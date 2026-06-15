@@ -545,30 +545,6 @@ with tab2:
             else:
                 if st.button("运行聚类并生成散点图"):
                     with st.spinner("正在计算文档向量和降维，请稍候..."):
-                        # 显式设置字体属性
-                        from matplotlib.font_manager import FontProperties
-                        # 查找系统中可用的中文字体路径
-                        chinese_font_path = None
-                        font_files = ["msyh.ttf", "msyhbd.ttf", "simhei.ttf", "simsun.ttc", "pingfang.ttc", "NotoSansCJKsc", "wqy-microhei.ttc", "wqy-zenhei.ttc"]
-                        for f in font_manager.fontManager.ttflist:
-                            if not hasattr(f, 'filename') or f.filename is None:
-                                continue
-                            lower_path = f.filename.lower()
-                            for font_file in font_files:
-                                if font_file in lower_path:
-                                    chinese_font_path = f.filename
-                                    break
-                            if chinese_font_path:
-                                break
-                        
-                        # 创建字体属性（优先使用字体文件路径）
-                        if chinese_font_path:
-                            font_prop = FontProperties(fname=chinese_font_path, size=12)
-                            title_font_prop = FontProperties(fname=chinese_font_path, size=14, weight='bold')
-                        else:
-                            font_prop = FontProperties(family=_CHINESE_FONT_NAME, size=12)
-                            title_font_prop = FontProperties(family=_CHINESE_FONT_NAME, size=14, weight='bold')
-                        
                         doc_ids = list(original_texts.keys())
                         docs_text = [original_texts[d] for d in doc_ids]
                         import jieba
@@ -582,14 +558,13 @@ with tab2:
                         labels = kmeans.fit_predict(X)
                         fig, ax = plt.subplots(figsize=(10, 6))
                         scatter = ax.scatter(X_tsne[:, 0], X_tsne[:, 1], c=labels, cmap='tab10', alpha=0.7)
-                        ax.set_title(f"文档聚类可视化 (t-SNE, {n_clusters} 个簇)", fontproperties=title_font_prop)
-                        ax.set_xlabel("t-SNE 第一维度", fontproperties=font_prop)
-                        ax.set_ylabel("t-SNE 第二维度", fontproperties=font_prop)
-                        # 设置图例标签字体
-                        cbar = plt.colorbar(scatter, label="簇编号")
-                        cbar.set_label("簇编号", fontproperties=font_prop)
+                        ax.set_title(f"Document Clustering Visualization (t-SNE, {n_clusters} clusters)")
+                        ax.set_xlabel("t-SNE Dimension 1")
+                        ax.set_ylabel("t-SNE Dimension 2")
+                        cbar = plt.colorbar(scatter)
+                        cbar.set_label("Cluster ID")
                         st.pyplot(fig)
-                        st.caption(f"聚类数: {n_clusters}，基于 TF‑IDF 特征 (top 500) 计算。")
+                        st.caption(f"Clusters: {n_clusters}, based on TF-IDF features (top 500).")
 
         # 3. 检索日志分析
         with st.expander("📜 检索日志分析", expanded=False):
