@@ -52,7 +52,7 @@ def _setup_chinese_font():
             "wqy-microhei.ttc", "wqy-zenhei.ttc"
         ]
         for f in font_manager.fontManager.ttflist:
-            if f.filename is None:
+            if not hasattr(f, 'filename') or f.filename is None:
                 continue
             lower_path = f.filename.lower()
             for candidate in font_file_candidates:
@@ -551,7 +551,7 @@ with tab2:
                         chinese_font_path = None
                         font_files = ["msyh.ttf", "msyhbd.ttf", "simhei.ttf", "simsun.ttc", "pingfang.ttc", "NotoSansCJKsc", "wqy-microhei.ttc", "wqy-zenhei.ttc"]
                         for f in font_manager.fontManager.ttflist:
-                            if f.filename is None:
+                            if not hasattr(f, 'filename') or f.filename is None:
                                 continue
                             lower_path = f.filename.lower()
                             for font_file in font_files:
