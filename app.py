@@ -6,16 +6,10 @@ import pandas as pd
 import math
 import numpy as np
 from collections import defaultdict
+import matplotlib
 import matplotlib.pyplot as plt
-
-# 尝试导入 sklearn，若失败则设置标志
-try:
-    from sklearn.manifold import TSNE
-    from sklearn.cluster import KMeans
-    from sklearn.feature_extraction.text import TfidfVectorizer
-    SKLEARN_AVAILABLE = True
-except ImportError:
-    SKLEARN_AVAILABLE = False
+from matplotlib import font_manager
+import altair as alt
 
 # ==========================================
 # 0. 页面全局配置
@@ -26,6 +20,48 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# ==========================================
+# 中文字体全局配置（防止 matplotlib 中文乱码）
+# ==========================================
+def _setup_chinese_font():
+    """从系统中查找支持中文的字体并应用到 matplotlib 全局。"""
+    candidate_fonts = [
+        "Microsoft YaHei", "SimHei", "SimSun", "PingFang SC",
+        "Heiti SC", "WenQuanYi Micro Hei", "WenQuanYi Zen Hei",
+        "Noto Sans CJK SC", "Noto Sans CJK", "Source Han Sans CN",
+        "Arial Unicode MS",
+    ]
+    available = {f.name for f in font_manager.fontManager.ttflist}
+    chosen = None
+    for name in candidate_fonts:
+        if name in available:
+            chosen = name
+            break
+    if chosen is None:
+        # 退化：尝试用任意包含 CJK / Chinese / YaHei / Hei 的字体
+        for f in font_manager.fontManager.ttflist:
+            lname = f.name.lower()
+            if "cjk" in lname or "chinese" in lname or "yahei" in lname or "hei" in lname or "pingfang" in lname:
+                chosen = f.name
+                break
+    if chosen is None:
+        chosen = "DejaVu Sans"  # 最终回退
+    plt.rcParams['font.sans-serif'] = [chosen, "DejaVu Sans"]
+    plt.rcParams['font.family'] = 'sans-serif'
+    plt.rcParams['axes.unicode_minus'] = False
+    return chosen
+
+_CHINESE_FONT_NAME = _setup_chinese_font()
+
+# 尝试导入 sklearn，若失败则设置标志
+try:
+    from sklearn.manifold import TSNE
+    from sklearn.cluster import KMeans
+    from sklearn.feature_extraction.text import TfidfVectorizer
+    SKLEARN_AVAILABLE = True
+except ImportError:
+    SKLEARN_AVAILABLE = False
 
 # ==========================================
 # 1. 数据加载与缓存（适配每行一篇的格式）
@@ -287,10 +323,10 @@ with st.sidebar:
         **排序算法：余弦相似度（Cosine Similarity）**  
         系统基于 TF‑IDF 构建文档向量，计算查询向量与每篇文档向量的余弦夹角，值越接近1表示越相关。该排序方式能有效平衡词频与文档长度，相比简单分数累加更符合信息检索理论。
 
-        **支持的检索语法：**
-        - 普通词检索：自动应用默认逻辑（OR/AND）
-        - 布尔检索：`AND` / `OR` / `NOT`，例如 `科技 AND 手机`
-        - 短语检索：英文双引号，例如 `"索爱 MP3"`（仍使用原始位置评分）
+        **支持的检索语法:**
+        - 普通词检索：自动应用默认逻辑（OR / AND），
+        - 布尔检索：AND (*)/ OR(+) / NOT，例如 篮球 OR 基金（或 篮球 + 基金）
+        - 短语检索：英文双引号，例如 "篮球比赛"（仍使用原始位置评分）。
 
         **结果展示：** 显示原始新闻全文，查询关键词高亮，相似度得分即为余弦值。检索结果下方将展示同一聚类簇的相关新闻推荐。
         """)
@@ -312,7 +348,7 @@ with tab1:
         query = st.text_input(
             "请输入检索式（支持布尔/短语）",
             key="search_input",
-            placeholder="示例: 科技 AND 手机   |   \"索爱 MP3\"   |  湖人",
+            placeholder="示例：篮球 AND 金融 | \"篮球比赛\" | 湖人",
             label_visibility="collapsed"
         )
     with col2:
@@ -375,7 +411,9 @@ with tab1:
         display_results = full_results[start_idx:end_idx]
 
         query_for_highlight = re.sub(r'"(.*?)"', r'\1', st.session_state.last_query)
-        highlight_terms = process_query(query_for_highlight)
+        # 过滤掉布尔操作符 OR / AND / NOT（避免在原文中被错误高亮）
+        highlight_terms = [t for t in process_query(query_for_highlight)
+                           if t.upper() not in ("OR", "AND", "NOT")]
 
         st.success(f"🎯 检索完成！共找到 {total_count} 篇相关文档（当前第 {st.session_state.current_page} / {total_pages} 页）")
         st.markdown("---")
@@ -433,7 +471,20 @@ with tab2:
     for word, posting in inverted_index.items():
         word_freq.append({"词汇": word, "文档覆盖数": len(posting)})
     df_freq = pd.DataFrame(word_freq).sort_values(by="文档覆盖数", ascending=False).head(20)
-    st.bar_chart(data=df_freq.set_index("词汇"))
+    # 使用 Altair 绘制交互式条形图，保持动态效果，横轴标签横向显示，去掉边框
+    chart = alt.Chart(df_freq).mark_bar(color="#1f77b4").encode(
+        x=alt.X("词汇:N", axis=alt.Axis(labelAngle=0, title="词汇")),
+        y=alt.Y("文档覆盖数:Q", axis=alt.Axis(title="文档覆盖数"))
+    ).properties(
+        width=800,
+        height=400,
+        title="全局高频词 (Top 20)"
+    ).configure_axis(
+        grid=False
+    ).configure_view(
+        strokeOpacity=0  # 去掉边框
+    )
+    st.altair_chart(chart, use_container_width=True)
 
     # 如果角色是数据分析师，显示高级分析工具
     if user_role == "数据分析师":
@@ -461,10 +512,7 @@ with tab2:
             else:
                 if st.button("运行聚类并生成散点图"):
                     with st.spinner("正在计算文档向量和降维，请稍候..."):
-                        # 设置 matplotlib 中文字体（防止中文乱码）
-                        plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'WenQuanYi Micro Hei']
-                        plt.rcParams['axes.unicode_minus'] = False
-
+                        # 中文字体已在模块顶部完成全局配置（_CHINESE_FONT_NAME）
                         doc_ids = list(original_texts.keys())
                         docs_text = [original_texts[d] for d in doc_ids]
                         import jieba
