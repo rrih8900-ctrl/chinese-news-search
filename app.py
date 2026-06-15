@@ -556,15 +556,34 @@ with tab2:
                         n_clusters = min(8, len(doc_ids)//10)
                         kmeans = KMeans(n_clusters=n_clusters, random_state=42)
                         labels = kmeans.fit_predict(X)
-                        fig, ax = plt.subplots(figsize=(10, 6))
-                        scatter = ax.scatter(X_tsne[:, 0], X_tsne[:, 1], c=labels, cmap='tab10', alpha=0.7)
-                        ax.set_title(f"Document Clustering Visualization (t-SNE, {n_clusters} clusters)")
-                        ax.set_xlabel("t-SNE Dimension 1")
-                        ax.set_ylabel("t-SNE Dimension 2")
-                        cbar = plt.colorbar(scatter)
-                        cbar.set_label("Cluster ID")
-                        st.pyplot(fig)
-                        st.caption(f"Clusters: {n_clusters}, based on TF-IDF features (top 500).")
+                        
+                        # 使用 Altair 绘制散点图（浏览器端渲染，支持中文）
+                        df = pd.DataFrame({
+                            't-SNE 第一维度': X_tsne[:, 0],
+                            't-SNE 第二维度': X_tsne[:, 1],
+                            '簇编号': labels.astype(str)
+                        })
+                        chart = alt.Chart(df).mark_circle(size=60, opacity=0.7).encode(
+                            x='t-SNE 第一维度',
+                            y='t-SNE 第二维度',
+                            color=alt.Color('簇编号', legend=alt.Legend(title='簇编号')),
+                            tooltip=['t-SNE 第一维度', 't-SNE 第二维度', '簇编号']
+                        ).properties(
+                            title=f'文档聚类可视化 (t-SNE, {n_clusters} 个簇)',
+                            width=700,
+                            height=400
+                        ).configure_title(
+                            fontSize=16,
+                            fontWeight='bold'
+                        ).configure_axis(
+                            labelFontSize=12,
+                            titleFontSize=14
+                        ).configure_legend(
+                            titleFontSize=14,
+                            labelFontSize=12
+                        )
+                        st.altair_chart(chart, use_container_width=True)
+                        st.caption(f"聚类数: {n_clusters}，基于 TF-IDF 特征 (top 500) 计算。")
 
         # 3. 检索日志分析
         with st.expander("📜 检索日志分析", expanded=False):
