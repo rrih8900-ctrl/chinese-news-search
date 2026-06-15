@@ -512,7 +512,11 @@ with tab2:
             else:
                 if st.button("运行聚类并生成散点图"):
                     with st.spinner("正在计算文档向量和降维，请稍候..."):
-                        # 中文字体已在模块顶部完成全局配置（_CHINESE_FONT_NAME）
+                        # 显式设置字体属性
+                        from matplotlib.font_manager import FontProperties
+                        font_prop = FontProperties(family=_CHINESE_FONT_NAME, size=12)
+                        title_font_prop = FontProperties(family=_CHINESE_FONT_NAME, size=14, weight='bold')
+                        
                         doc_ids = list(original_texts.keys())
                         docs_text = [original_texts[d] for d in doc_ids]
                         import jieba
@@ -526,10 +530,12 @@ with tab2:
                         labels = kmeans.fit_predict(X)
                         fig, ax = plt.subplots(figsize=(10, 6))
                         scatter = ax.scatter(X_tsne[:, 0], X_tsne[:, 1], c=labels, cmap='tab10', alpha=0.7)
-                        ax.set_title(f"文档聚类可视化 (t-SNE, {n_clusters} 个簇)")
-                        ax.set_xlabel("t-SNE 第一维度")
-                        ax.set_ylabel("t-SNE 第二维度")
-                        plt.colorbar(scatter, label="簇编号")
+                        ax.set_title(f"文档聚类可视化 (t-SNE, {n_clusters} 个簇)", fontproperties=title_font_prop)
+                        ax.set_xlabel("t-SNE 第一维度", fontproperties=font_prop)
+                        ax.set_ylabel("t-SNE 第二维度", fontproperties=font_prop)
+                        # 设置图例标签字体
+                        cbar = plt.colorbar(scatter, label="簇编号")
+                        cbar.set_label("簇编号", fontproperties=font_prop)
                         st.pyplot(fig)
                         st.caption(f"聚类数: {n_clusters}，基于 TF‑IDF 特征 (top 500) 计算。")
 
