@@ -9,6 +9,7 @@ from collections import defaultdict
 import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib import font_manager
+import os
 import altair as alt
 
 # ==========================================
@@ -26,31 +27,61 @@ st.set_page_config(
 # ==========================================
 def _setup_chinese_font():
     """从系统中查找支持中文的字体并应用到 matplotlib 全局。"""
-    candidate_fonts = [
+    # 方法1：搜索字体名称
+    font_name_candidates = [
         "Microsoft YaHei", "SimHei", "SimSun", "PingFang SC",
         "Heiti SC", "WenQuanYi Micro Hei", "WenQuanYi Zen Hei",
         "Noto Sans CJK SC", "Noto Sans CJK", "Source Han Sans CN",
-        "Arial Unicode MS",
+        "Noto Serif CJK SC", "Source Han Serif CN", "Arial Unicode MS",
+        "STSong", "STHeiti", "STKaiti", "STFangsong", "KaiTi", "FangSong"
     ]
-    available = {f.name for f in font_manager.fontManager.ttflist}
-    chosen = None
-    for name in candidate_fonts:
-        if name in available:
-            chosen = name
+    available_names = {f.name for f in font_manager.fontManager.ttflist}
+    
+    chosen_name = None
+    for name in font_name_candidates:
+        if name in available_names:
+            chosen_name = name
             break
-    if chosen is None:
-        # 退化：尝试用任意包含 CJK / Chinese / YaHei / Hei 的字体
+    
+    # 方法2：搜索字体文件名（某些字体名称可能不匹配）
+    if chosen_name is None:
+        font_file_candidates = [
+            "msyh.ttf", "msyhbd.ttf", "simhei.ttf", "simsun.ttc",
+            "simkai.ttf", "simfang.ttf", "pingfang.ttc", "NotoSansCJKsc",
+            "NotoSerifCJKsc", "SourceHanSansCN", "SourceHanSerifCN",
+            "wqy-microhei.ttc", "wqy-zenhei.ttc"
+        ]
+        for f in font_manager.fontManager.ttflist:
+            lower_path = f.filename.lower()
+            for candidate in font_file_candidates:
+                if candidate in lower_path:
+                    chosen_name = f.name
+                    break
+            if chosen_name:
+                break
+    
+    # 方法3：搜索包含 CJK/Chinese/Hei/Kai/Fang 等关键字的字体
+    if chosen_name is None:
         for f in font_manager.fontManager.ttflist:
             lname = f.name.lower()
-            if "cjk" in lname or "chinese" in lname or "yahei" in lname or "hei" in lname or "pingfang" in lname:
-                chosen = f.name
+            if any(key in lname for key in ["cjk", "chinese", "yahei", "hei", "kai", "fang", "song", "pingfang"]):
+                chosen_name = f.name
                 break
-    if chosen is None:
-        chosen = "DejaVu Sans"  # 最终回退
-    plt.rcParams['font.sans-serif'] = [chosen, "DejaVu Sans"]
+    
+    # 如果还是没找到，使用 fallback
+    if chosen_name is None:
+        chosen_name = "DejaVu Sans"
+    
+    # 设置 matplotlib 全局字体
+    plt.rcParams['font.sans-serif'] = [chosen_name, "DejaVu Sans", "Arial Unicode MS"]
     plt.rcParams['font.family'] = 'sans-serif'
     plt.rcParams['axes.unicode_minus'] = False
-    return chosen
+    plt.rcParams['mathtext.fontset'] = 'custom'
+    plt.rcParams['mathtext.rm'] = 'DejaVu Sans'
+    plt.rcParams['mathtext.it'] = 'DejaVu Sans:italic'
+    plt.rcParams['mathtext.bf'] = 'DejaVu Sans:bold'
+    
+    return chosen_name
 
 _CHINESE_FONT_NAME = _setup_chinese_font()
 
@@ -514,8 +545,25 @@ with tab2:
                     with st.spinner("正在计算文档向量和降维，请稍候..."):
                         # 显式设置字体属性
                         from matplotlib.font_manager import FontProperties
-                        font_prop = FontProperties(family=_CHINESE_FONT_NAME, size=12)
-                        title_font_prop = FontProperties(family=_CHINESE_FONT_NAME, size=14, weight='bold')
+                        # 查找系统中可用的中文字体路径
+                        chinese_font_path = None
+                        font_files = ["msyh.ttf", "msyhbd.ttf", "simhei.ttf", "simsun.ttc", "pingfang.ttc", "NotoSansCJKsc", "wqy-microhei.ttc", "wqy-zenhei.ttc"]
+                        for f in font_manager.fontManager.ttflist:
+                            lower_path = f.filename.lower()
+                            for font_file in font_files:
+                                if font_file in lower_path:
+                                    chinese_font_path = f.filename
+                                    break
+                            if chinese_font_path:
+                                break
+                        
+                        # 创建字体属性（优先使用字体文件路径）
+                        if chinese_font_path:
+                            font_prop = FontProperties(fname=chinese_font_path, size=12)
+                            title_font_prop = FontProperties(fname=chinese_font_path, size=14, weight='bold')
+                        else:
+                            font_prop = FontProperties(family=_CHINESE_FONT_NAME, size=12)
+                            title_font_prop = FontProperties(family=_CHINESE_FONT_NAME, size=14, weight='bold')
                         
                         doc_ids = list(original_texts.keys())
                         docs_text = [original_texts[d] for d in doc_ids]
